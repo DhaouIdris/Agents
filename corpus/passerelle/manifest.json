@@ -1,0 +1,74 @@
+[
+  {
+    "version": "2",
+    "status": "current",
+    "published_on": "2026-04-01",
+    "access_groups": [
+      "staff"
+    ],
+    "doc_id": "teletravail-fr-v2",
+    "title": "Télétravail — politique Passerelle, version 2",
+    "language": "fr",
+    "source_path": "teletravail_fr_v2.md"
+  },
+  {
+    "version": "2",
+    "status": "current",
+    "published_on": "2026-04-01",
+    "access_groups": [
+      "staff"
+    ],
+    "doc_id": "teletravail-en-v2",
+    "title": "Remote work — Passerelle policy, version 2",
+    "language": "en",
+    "source_path": "teletravail_en_v2.md"
+  },
+  {
+    "version": "1",
+    "status": "archived",
+    "published_on": "2025-09-01",
+    "access_groups": [
+      "staff"
+    ],
+    "doc_id": "teletravail-fr-v1",
+    "title": "Télétravail — politique Passerelle, version 1 archivée",
+    "language": "fr",
+    "source_path": "teletravail_fr_v1.md"
+  },
+  {
+    "version": "1",
+    "status": "current",
+    "published_on": "2026-04-01",
+    "access_groups": [
+      "staff"
+    ],
+    "doc_id": "demandes-fr-v1",
+    "title": "Demandes internes — guide Passerelle",
+    "language": "fr",
+    "source_path": "demandes_fr_v1.md"
+  },
+  {
+    "version": "1",
+    "status": "current",
+    "published_on": "2026-04-01",
+    "access_groups": [
+      "staff"
+    ],
+    "doc_id": "demandes-en-v1",
+    "title": "Internal requests — Passerelle guide",
+    "language": "en",
+    "source_path": "demandes_en_v1.md"
+  },
+  {
+    "version": "1",
+    "status": "current",
+    "published_on": "2026-04-01",
+    "access_groups": [
+      "hr"
+    ],
+    "doc_id": "note-rh-fr-v1",
+    "title": "Réexamen des demandes — note interne RH",
+    "language": "fr",
+    "source_path": "note_rh_fr_v1.md"
+  }
+]

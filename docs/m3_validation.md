@@ -62,7 +62,8 @@ puis redémarrer ce kernel. L'installation ne fait pas partie des cellules de te
 .\.venv\Scripts\python.exe scripts/validate_m3.py
 ```
 
-La suite principale comporte 56 tests ; les deux parties historiques de l'exercice
+À la clôture de M3, sa suite principale comporte 56 tests ; les modules suivants
+peuvent en ajouter. Les deux parties historiques de l'exercice
 en comportent 12. La démonstration appelle le vrai `Assistant.chat` et SQLite avec
 un générateur et un compteur simulés. Elle doit afficher :
 
