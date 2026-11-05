@@ -25,3 +25,5 @@ jobs:
       - run: python -m unittest discover -s tests -v
       - name: Execute notebook without Ollama
         run: python scripts/check_notebook.py
+      - name: Execute M4 notebook without completing the exercise
+        run: python scripts/check_notebook.py m4.ipynb

@@ -1,5 +1,9 @@
 # Passerelle — formation assistants IA
 
+**Début M4 : [corpus, provenance et premier chargeur](docs/m4_ingestion.md).**
+Ouvrir `m4.ipynb` ; compléter `load_document` dans `exercises/ingestion.py`.
+Le corpus est synthétique et cette séance n'utilise aucun LLM.
+
 Assistant local développé pendant les modules **M1 à M3** : messages, streaming,
 mesures d'inférence, conversations persistantes et résumé du contexte.
 
