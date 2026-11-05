@@ -6,6 +6,7 @@ from typing import Literal
 
 from .client import Message, OllamaClient, OllamaError
 from .config import SUMMARY_PROMPT
+from .tokens import count_tokens
 
 MemoryMode = Literal["full", "window", "summary"]
 
@@ -95,3 +96,33 @@ class ContextManager:
             *recent[1:],
         ]
         return PreparedContext(context, len(old), summary)
+
+
+def fit_recent_context(
+    history,
+    token_counter,
+    *,
+    num_ctx=2048,
+    reserved_output=128,
+    margin=64,
+):
+    """Renvoie un contexte récent respectant le budget."""
+    validate_history(history)
+
+    if num_ctx <= 0 or reserved_output < 0 or margin < 0:
+        raise ValueError("Paramètres de budget invalides.")
+
+    budget = num_ctx - reserved_output - margin
+
+    if budget <= 0:
+        raise ValueError("Aucun budget disponible pour l'entrée.")
+
+    recent = [message.copy() for message in history]
+    
+    if count_tokens([recent[0], recent[-1]]) > budget:
+        raise ValueError("Budget is not sufficient.")
+    
+    while token_counter(recent) > budget:
+        del recent[1:3]
+
+    return recent
