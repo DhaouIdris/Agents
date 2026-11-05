@@ -7,6 +7,10 @@ Le point d'entrée reste **[test.ipynb](test.ipynb)**. Le notebook contient les
 expériences ; les fonctions réutilisables sont dans `passerelle/`. Une fonction
 possède désormais une seule définition.
 
+**Suite M3 : [tester le budget puis implémenter le cache](docs/m3_budget_cache.md).**
+Le guide donne les commandes Windows et notebook. Les tests de budget sont prêts ;
+les fonctions du cache dans `exercises/` restent à compléter.
+
 ## Installation sous Windows
 
 Dans le dossier du dépôt, avec Python 3.10 ou plus récent :
