@@ -95,10 +95,13 @@ class CachedMemoryTests(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(self.generate.call_count, 1)
         self.assertEqual(self.history, before)
-        self.assertEqual(len(first), 5)
+        self.assertEqual(len(first), 4)
         self.assertEqual(first[0], self.history[0])
-        self.assertEqual(first[2:], self.history[3:])
-        self.assertTrue(all(a is not b for a, b in zip(first[2:], self.history[3:])))
+        self.assertEqual(first[1:3], self.history[3:5])
+        self.assertTrue(first[-1]["content"].endswith(self.history[-1]["content"]))
+        self.assertIn("<conversation_summary>\nRésumé\n", first[-1]["content"])
+        self.assertTrue(all(a is not b for a, b in zip(first[1:], self.history[3:])))
+        self.assertEqual([m["role"] for m in first], ["system", "user", "assistant", "user"])
         request = self.generate.call_args.args[0]
         self.assertEqual(json.loads(request[1]["content"]), self.history[1:3])
         self.assertEqual(self.generate.call_args.kwargs, {"max_tokens": 20, "num_ctx": 80})
@@ -187,7 +190,7 @@ class CachedMemoryTests(unittest.TestCase):
         before = self.cache.load("alice", "one")
         self.generate.return_value = response("Autre résumé")
         with self.assertRaisesRegex(ValueError, "contexte résumé"):
-            self.refresh(num_ctx=70)
+            self.refresh(num_ctx=65)
         self.assertEqual(self.cache.load("alice", "one"), before)
 
     def test_summary_input_over_budget_fails_before_model_or_write(self):

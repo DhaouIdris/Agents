@@ -2,13 +2,31 @@
 
 import argparse
 import json
+import re
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
 
 from passerelle import Assistant, ChatResult, Metrics, OllamaClient, Settings, SQLiteStore
 from passerelle.config import SYSTEM_PROMPT
-from passerelle.summary_cache import prepare_cached_context
+from passerelle.summary_cache import (
+    SummaryCacheEntry,
+    context_from_cache,
+    prepare_cached_context,
+    source_hash,
+)
+
+
+def check_fixture_facts(text):
+    """Smoke lexical propre à cette fixture ; ni juge sémantique ni contrôle de production."""
+    lowered = text.casefold()
+    counts = re.findall(r"\b(\d+)\s+(?:dossiers?|files?|records?)\b", lowered)
+    return {
+        "name_present": bool(re.search(r"\blina\b", lowered)),
+        "city_present": bool(re.search(r"\blyon\b", lowered)),
+        "hardware_present": bool(re.search(r"\b(cpu|processor|processeur)\b", lowered)),
+        "record_count_claim_consistent": all(int(n) == 25 for n in counts),
+    }
 
 
 def run_offline():
@@ -52,7 +70,7 @@ def run_offline():
     print("Simulation uniquement : la fidélité du modèle n'est pas évaluée.")
 
 
-def run_live():
+def run_live(*, diagnose=False):
     """Données synthétiques, DB temporaire, vrai tokenizer et vrais appels Ollama."""
     from passerelle.tokens import count_tokens
 
@@ -60,6 +78,8 @@ def run_live():
     client = OllamaClient(settings)
     original_generate = client.generate
     measurements = []
+    active_margin = 64
+    phase = None
 
     def measured_generate(messages, **kwargs):
         estimate = count_tokens(messages)
@@ -67,10 +87,13 @@ def run_live():
         measured = result.metrics.input_tokens
         measurements.append(
             {
-                "kind": "summary" if "max_tokens" in kwargs else "answer",
+                "kind": phase or ("summary" if "max_tokens" in kwargs else "answer"),
                 "reference_tokens": estimate,
                 "server_prompt_eval_count": measured,
                 "delta_server_minus_reference": None if measured is None else measured - estimate,
+                "reserved_output": kwargs.get("max_tokens", settings.max_tokens),
+                "margin": active_margin,
+                "truncated": result.truncated,
             }
         )
         return result
@@ -103,6 +126,32 @@ def run_live():
     margin = settings.num_ctx - settings.max_tokens - (raw_count - 1)
     if margin < 64:
         raise ValueError("Fixture trop longue pour ce tokenizer ; raccourcir records.")
+    diagnostics = {}
+    if diagnose:
+        # Deux contrôles : les originaux, puis une note correcte écrite pour la fixture.
+        # Cette note n'est jamais utilisée comme résumé produit par le système.
+        phase = "full_history_baseline"
+        baseline = client.generate(pending, stream=False)
+        diagnostics[phase] = {
+            "answer": baseline.content,
+            "facts": check_fixture_facts(baseline.content),
+            "truncated": baseline.truncated,
+        }
+        reference = SummaryCacheEntry(
+            "Utilisateur : Lina. Lieu de travail : Lyon. Matériel : CPU uniquement.",
+            3,
+            source_hash(pending, 3),
+            "fixture-reference-only",
+        )
+        phase = "reference_summary_baseline"
+        baseline = client.generate(context_from_cache(pending, reference), stream=False)
+        diagnostics[phase] = {
+            "answer": baseline.content,
+            "facts": check_fixture_facts(baseline.content),
+            "truncated": baseline.truncated,
+        }
+    phase = None
+    active_margin = margin
     with tempfile.TemporaryDirectory() as directory:
         store = SQLiteStore(Path(directory) / "live.db")
         store.save("alice", "m3-live", history)
@@ -147,23 +196,44 @@ def run_live():
             "cached_reuse_without_generation": True,
             "original_messages_saved": len(store.load("alice", "m3-live")),
             "calls": measurements,
+            "summary_fact_checks": check_fixture_facts(entry.summary_text),
+            "answer_fact_checks": check_fixture_facts(result.content),
+            "diagnostics": diagnostics,
+            "manual_review_required": True,
         }
         # Mesurer aussi l'appel interne : le template JSON du résumeur peut différer.
-        for call in client.generate.call_args_list:
-            estimate = count_tokens(call.args[0])
-            output = call.kwargs.get("max_tokens", settings.max_tokens)
-            if estimate + output + margin > settings.num_ctx:
+        for call in measurements:
+            if (
+                call["reference_tokens"] + call["reserved_output"] + call["margin"]
+                > settings.num_ctx
+            ):
                 raise AssertionError("Un appel dépasse le budget de référence.")
         print(json.dumps(report, ensure_ascii=False, indent=2))
     print("À vérifier : Lina, Lyon, CPU, réponse en anglais et absence d'invention.")
     print("Un écart de comptage demande d'examiner les templates ; ce test ne les certifie pas.")
+    facts_ok = all(report["summary_fact_checks"].values()) and all(
+        report["answer_fact_checks"].values()
+    )
+    counts_ok = all(call["delta_server_minus_reference"] == 0 for call in measurements)
+    complete = not any(call["truncated"] for call in measurements)
+    if not (facts_ok and counts_ok and complete):
+        raise SystemExit(
+            "Échec du smoke test : examiner les faits, les comptages ou la troncature."
+        )
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--live", action="store_true", help="Appeler réellement Ollama local.")
+    parser.add_argument(
+        "--diagnose",
+        action="store_true",
+        help="Avec --live : ajouter deux réponses témoins (originaux et résumé de référence).",
+    )
     args = parser.parse_args()
-    run_live() if args.live else run_offline()
+    if args.diagnose and not args.live:
+        parser.error("--diagnose nécessite --live")
+    run_live(diagnose=args.diagnose) if args.live else run_offline()
 
 
 if __name__ == "__main__":

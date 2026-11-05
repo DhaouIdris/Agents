@@ -95,6 +95,8 @@ print(result.metrics.as_dict())
 Il renvoie toujours un `ChatResult` : `content`, `metrics` et `done_reason`.
 Le streaming affiche du texte seulement si un callback `on_token` est fourni.
 Les résumés internes restent silencieux.
+Les erreurs HTTP conservent le code et un extrait du détail serveur ; un HTTP 500
+ne doit pas être diagnostiqué automatiquement comme une absence de modèle ou de RAM.
 
 ## Stratégies de contexte
 
@@ -113,6 +115,11 @@ système. SQLite conserve les messages originaux et non les messages synthétiqu
 de compaction. Une réponse interrompue, vide ou tronquée n'est pas enregistrée
 comme un tour réussi. Des fragments peuvent néanmoins avoir été affichés avant
 qu'une interruption soit détectée.
+
+Dans le mode intégré, la note est jointe à la question courante, sans message user
+supplémentaire. Cela conserve l'alternance des rôles. Le test live contrôle les faits
+attendus de sa fixture et propose `--diagnose` pour comparer avec les originaux et
+une note de référence. Ces contrôles ne constituent pas une évaluation sémantique générale.
 
 Un résumé réussi peut rester en cache si l'appel de réponse échoue ensuite : il
 ne couvre que des échanges originaux déjà sauvegardés. L'historique reste inchangé.

@@ -83,6 +83,26 @@ class ClientTests(unittest.TestCase):
             with self.assertRaisesRegex(OllamaError, "JSON"):
                 self.client.generate(MESSAGES, stream=True)
 
+    def test_http_500_preserves_server_error(self):
+        response = requests.Response()
+        response.status_code = 500
+        response._content = b'{"error":"runner exited: insufficient memory"}'
+        self.response.raise_for_status.side_effect = requests.HTTPError(response=response)
+        with patch("passerelle.client.requests.post", return_value=self.response):
+            with self.assertRaisesRegex(OllamaError, "HTTP 500.*insufficient memory"):
+                self.client.generate(MESSAGES)
+
+    def test_http_non_json_error_is_bounded(self):
+        response = requests.Response()
+        response.status_code = 502
+        response._content = b"upstream failure " + b"x" * 1000
+        self.response.raise_for_status.side_effect = requests.HTTPError(response=response)
+        with patch("passerelle.client.requests.post", return_value=self.response):
+            with self.assertRaises(OllamaError) as caught:
+                self.client.generate(MESSAGES)
+        self.assertIn("HTTP 502", str(caught.exception))
+        self.assertLess(len(str(caught.exception)), 750)
+
     def test_unknown_metrics_are_not_reported_as_zero(self):
         self.response.json.return_value = {
             "message": {"content": "OK"},
