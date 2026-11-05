@@ -106,6 +106,15 @@ ni la langue de réponse. Si un fait manque, si une sortie est tronquée ou si l
 comptages diffèrent, le script termine en échec après avoir affiché le rapport.
 Une relecture humaine reste nécessaire même quand ces contrôles passent.
 
+Le diagnostic réel a aussi montré qu'un résumé contenant les trois mots attendus
+peut rester inutilisable : « Bien reçu pour Lina, Lyon et le CPU » n'explicite pas
+qui s'appelle Lina, ce que décrit Lyon et à qui s'applique la contrainte. Le prompt
+demande désormais des propositions factuelles et quatre rubriques, sans fournir
+les valeurs de la fixture. `summary_style_checks` refuse quelques formes d'accusé
+de réception, mais ne vérifie pas toutes les relations sémantiques. La réponse témoin
+« you are from Lyon » doit aussi être relue : la source établit un lieu de travail,
+pas une origine. Les checks lexicaux ne détectent pas cette nuance.
+
 Pour isoler une erreur de résumé d'une erreur d'utilisation du contexte :
 
 ```powershell

@@ -27,6 +27,11 @@ class LiveValidationTests(unittest.TestCase):
         self.assertFalse(checks["record_count_claim_consistent"])
         self.assertTrue(checks["city_present"])
         self.assertTrue(checks["hardware_present"])
+        weak = "Bien reçu pour Lina, Lyon et le CPU."
+        self.assertTrue(all(module.check_fixture_facts(weak).values()))
+        self.assertFalse(module.check_summary_style(weak)["not_acknowledgement"])
+        explicit = "Faits utilisateur : l'utilisateur s'appelle Lina et travaille à Lyon. Contraintes : CPU uniquement."
+        self.assertTrue(module.check_summary_style(explicit)["not_acknowledgement"])
 
     def test_live_control_flow_reports_success_and_failure_with_simulated_dependencies(self):
         module = load_script()

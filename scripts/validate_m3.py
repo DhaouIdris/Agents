@@ -29,6 +29,14 @@ def check_fixture_facts(text):
     }
 
 
+def check_summary_style(text):
+    """Détecter l'accusé de réception observé, sans prétendre vérifier toutes les relations."""
+    acknowledgement = re.match(
+        r"\s*(?:bien reçu|j'ai bien noté|je comprends|d'accord)\b", text, re.IGNORECASE
+    )
+    return {"not_acknowledgement": acknowledgement is None}
+
+
 def run_offline():
     """Exerce le vrai Assistant et SQLite, avec un compteur et un LLM simulés."""
     client = Mock()
@@ -197,6 +205,7 @@ def run_live(*, diagnose=False):
             "original_messages_saved": len(store.load("alice", "m3-live")),
             "calls": measurements,
             "summary_fact_checks": check_fixture_facts(entry.summary_text),
+            "summary_style_checks": check_summary_style(entry.summary_text),
             "answer_fact_checks": check_fixture_facts(result.content),
             "diagnostics": diagnostics,
             "manual_review_required": True,
@@ -214,9 +223,10 @@ def run_live(*, diagnose=False):
     facts_ok = all(report["summary_fact_checks"].values()) and all(
         report["answer_fact_checks"].values()
     )
+    style_ok = all(report["summary_style_checks"].values())
     counts_ok = all(call["delta_server_minus_reference"] == 0 for call in measurements)
     complete = not any(call["truncated"] for call in measurements)
-    if not (facts_ok and counts_ok and complete):
+    if not (facts_ok and style_ok and counts_ok and complete):
         raise SystemExit(
             "Échec du smoke test : examiner les faits, les comptages ou la troncature."
         )
