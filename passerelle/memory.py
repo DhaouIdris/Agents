@@ -6,7 +6,6 @@ from typing import Literal
 
 from .client import Message, OllamaClient, OllamaError
 from .config import SUMMARY_PROMPT
-from .tokens import count_tokens
 
 MemoryMode = Literal["full", "window", "summary"]
 
@@ -118,10 +117,10 @@ def fit_recent_context(
         raise ValueError("Aucun budget disponible pour l'entrée.")
 
     recent = [message.copy() for message in history]
-    
-    if count_tokens([recent[0], recent[-1]]) > budget:
-        raise ValueError("Budget is not sufficient.")
-    
+
+    if token_counter([recent[0], recent[-1]]) > budget:
+        raise ValueError("Le système et la dernière question dépassent le budget.")
+
     while token_counter(recent) > budget:
         del recent[1:3]
 
