@@ -10,6 +10,8 @@ from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 
+from passerelle.memory import validate_history
+
 
 @dataclass(frozen=True)
 class SummaryCacheEntry:
@@ -285,3 +287,74 @@ def refresh_summary_cache(
 
     cache.save(user_id, conversation_id, entry)
     return entry
+
+
+
+def prepare_cached_context(
+    history,
+    cache,
+    user_id,
+    conversation_id,
+    summarizer_fingerprint,
+    token_counter,
+    generate,
+    *,
+    num_ctx=2048,
+    reserved_output=128,
+    summary_tokens=192,
+    margin=64,
+    keep_pairs=1,
+):
+    """Prépare le contexte et actualise le cache si nécessaire."""
+    validate_history(history)
+
+    if (
+        isinstance(keep_pairs, bool)
+        or not isinstance(keep_pairs, int)
+        or keep_pairs < 0
+    ):
+        raise ValueError("keep_pairs doit être un entier positif ou nul.")
+
+    # Paramètres partagés par select_context et refresh_summary_cache.
+    budget_options = {
+        "num_ctx": num_ctx,
+        "reserved_output": reserved_output,
+        "margin": margin,
+    }
+
+    entry = cache.load(user_id, conversation_id)
+
+    context = select_context(history,
+                    entry,
+                    summarizer_fingerprint=summarizer_fingerprint,
+                    token_counter=token_counter,
+                    **budget_options,
+                   )
+    if context is not None:
+         return context
+    
+    # Garder les derniers couples complets et la question courante.
+    covered_until = max(
+        1,
+        len(history) - (2 * keep_pairs + 1),
+    )
+
+    if covered_until < 3:
+        raise ValueError(
+            "Aucun couple ancien à résumer avec ce réglage. "
+            "Réduis keep_pairs ou la taille des messages."
+        )
+
+    refreshed_entry = refresh_summary_cache(cache=cache,
+                          user_id=user_id,
+                          conversation_id=conversation_id,
+                          history=history,
+                          covered_until=covered_until,
+                          summarizer_fingerprint=summarizer_fingerprint,
+                          token_counter=token_counter,
+                          generate=generate,
+                          summary_tokens=summary_tokens,
+                          **budget_options,
+                          )
+
+    return context_from_cache(history, refreshed_entry)
