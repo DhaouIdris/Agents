@@ -19,7 +19,9 @@ class StorageAndAssistantTests(unittest.TestCase):
         self.client = Mock()
         self.client.settings = Settings()
         self.client.generate.return_value = response()
-        self.assistant = Assistant(self.client, self.store)
+        self.assistant = Assistant(
+            self.client, self.store, token_counter=lambda messages: 10 * len(messages)
+        )
 
     def test_persistence_and_user_conversation_partition(self):
         self.assistant.chat("alice", "same", "Je m'appelle Lina.", stream=False)
@@ -55,11 +57,13 @@ class StorageAndAssistantTests(unittest.TestCase):
         self.assertIsNone(self.store.load("alice", "one"))
 
     def test_summary_does_not_replace_full_history_in_sqlite(self):
-        self.assistant = Assistant(self.client, self.store, max_pairs=1)
+        self.assistant = Assistant(
+            self.client, self.store, max_pairs=1, token_counter=lambda messages: 10 * len(messages)
+        )
         self.assistant.chat("alice", "one", "Mon prénom est Lina", stream=False)
         self.assistant.chat("alice", "one", "Je travaille sans GPU", stream=False)
         self.client.generate.side_effect = [response("Lina."), response("Votre prénom est Lina.")]
-        self.assistant.chat("alice", "one", "Mon prénom ?", stream=False)
+        self.assistant.chat("alice", "one", "Mon prénom ?", stream=False, mode="summary")
         saved = self.store.load("alice", "one")
         self.assertEqual(len(saved), 7)
         self.assertEqual(saved[1]["content"], "Mon prénom est Lina")
@@ -67,7 +71,9 @@ class StorageAndAssistantTests(unittest.TestCase):
 
     def test_reopening_store_does_not_reset_existing_conversation(self):
         self.assistant.chat("alice", "one", "Je m'appelle Lina", stream=False)
-        second = Assistant(self.client, SQLiteStore(self.path))
+        second = Assistant(
+            self.client, SQLiteStore(self.path), token_counter=lambda messages: 10 * len(messages)
+        )
         second.chat("alice", "one", "Mon prénom ?", stream=False)
         sent = self.client.generate.call_args.args[0]
         self.assertIn("Lina", sent[1]["content"])

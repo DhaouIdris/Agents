@@ -115,6 +115,22 @@ class OllamaClient:
                 else:
                     final = response.json()
                     parts.append(self._content(final))
+        except requests.HTTPError as exc:
+            failed_response = exc.response
+            detail = "Détail serveur indisponible."
+            status = "inconnu"
+            if failed_response is not None:
+                status = failed_response.status_code
+                try:
+                    body = failed_response.json()
+                    detail = body.get("error", detail) if isinstance(body, dict) else detail
+                except ValueError:
+                    detail = failed_response.text or detail
+            # Ne pas afficher les messages envoyés ; borner le diagnostic serveur.
+            detail = str(detail).strip()[:600]
+            raise OllamaError(
+                f"Ollama HTTP {status} ({self.settings.chat_url}) : {detail}"
+            ) from exc
         except requests.RequestException as exc:
             raise OllamaError(
                 f"Appel Ollama échoué ({self.settings.chat_url}). "
