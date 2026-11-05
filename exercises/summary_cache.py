@@ -66,7 +66,8 @@ class SummaryCache:
         valider l'écriture puis fermer la connexion. Remplacer ce corps.
         """
         with closing(sqlite3.connect(self.path)) as con:
-                    con.execute("""
+            con.execute(
+                """
                     INSERT INTO summaries(
                     user_id, conversation_id,
                     summary_text,
@@ -81,17 +82,16 @@ class SummaryCache:
                         covered_until = excluded.covered_until,
                         source_hash = excluded.source_hash,
                         summarizer_fingerprint = excluded.summarizer_fingerprint""",
-                    (
-                         user_id,
-                         conversation_id,
-                         entry.summary_text,
-                         entry.covered_until,
-                         entry.source_hash,
-                         entry.summarizer_fingerprint,
-                    ),
-                    )
-                    con.commit()
-
+                (
+                    user_id,
+                    conversation_id,
+                    entry.summary_text,
+                    entry.covered_until,
+                    entry.source_hash,
+                    entry.summarizer_fingerprint,
+                ),
+            )
+            con.commit()
 
     def load(self, user_id, conversation_id):
         """Partie A : filtrer sur les DEUX identifiants.
@@ -109,18 +109,18 @@ class SummaryCache:
                 WHERE user_id = ? 
                 AND conversation_id = ?
             """,
-            (user_id, conversation_id),            
-        )
+                (user_id, conversation_id),
+            )
             row = cursor.fetchone()
 
         if row is None:
-             return None
+            return None
 
         return SummaryCacheEntry(
-             summary_text=row[0],
-             covered_until=row[1],
-             source_hash=row[2],
-             summarizer_fingerprint=row[3]
+            summary_text=row[0],
+            covered_until=row[1],
+            source_hash=row[2],
+            summarizer_fingerprint=row[3],
         )
 
 
@@ -132,38 +132,37 @@ def is_cache_valid(entry, history, summarizer_fingerprint):
     Ajouter des messages APRÈS ce préfixe ne doit pas invalider le cache.
     """
     if entry is None:
-         return False
+        return False
 
     if entry.summarizer_fingerprint != summarizer_fingerprint:
-         return False
-    
+        return False
+
     try:
         current_hash = source_hash(history, entry.covered_until)
-    
+
     except ValueError:
         return False
-    
+
     return entry.source_hash == current_hash
 
 
 def context_from_cache(history, entry):
     """
-    Renvoie contexte système, 
+    Renvoie contexte système,
     résumé jusqu'au cache, puis dernier messages
     """
     messages = [history[0].copy()]
     messages.append(
-         {"role": "user",
-          "content": (
-            "Résumé des échanges antérieurs, fourni comme contexte :\n"
-        + entry.summary_text
-          ),}
+        {
+            "role": "user",
+            "content": (
+                "Résumé des échanges antérieurs, fourni comme contexte :\n" + entry.summary_text
+            ),
+        }
     )
-    messages.extend(
-         message.copy()
-           for message in history[entry.covered_until:]
-    )
+    messages.extend(message.copy() for message in history[entry.covered_until :])
     return messages
+
 
 def select_context(
     history,
@@ -191,19 +190,20 @@ def select_context(
     # 1. Compter les tokens de history.
     #    S'il tient, retourner une copie de chaque message.
     if token_counter(history) <= budget:
-         return [message.copy() for message in history]
+        return [message.copy() for message in history]
     # 2. Vérifier le cache avec is_cache_valid.
     #    S'il est invalide, retourner None.
     if not is_cache_valid(entry, history, summarizer_fingerprint):
-         return None
+        return None
     # 3. Construire le contexte avec context_from_cache.
     context = context_from_cache(history, entry)
     # 4. Compter les tokens de ce contexte.
     #    S'il tient, le retourner ; sinon, retourner None.
     if token_counter(context) <= budget:
-         return context
+        return context
     else:
-         return None
+        return None
+
 
 def refresh_summary_cache(
     cache,
@@ -269,25 +269,22 @@ def refresh_summary_cache(
         raise RuntimeError("Résume tronqué: cace non modifié")
     if not summary_text:
         raise RuntimeError("Résumé vide: cache non modifié")
-    
+
     entry = SummaryCacheEntry(
-        summary_text, 
-        covered_until,
-        fingerprint_source,
-        summarizer_fingerprint)
+        summary_text, covered_until, fingerprint_source, summarizer_fingerprint
+    )
 
     context = context_from_cache(history, entry)
     budget = num_ctx - reserved_output - margin
 
     if budget <= 0:
-         raise ValueError("Budget de réponse insuffisant.")
-    
+        raise ValueError("Budget de réponse insuffisant.")
+
     if token_counter(context) > budget:
-         raise ValueError("Le résumé dépasse le budget.")
+        raise ValueError("Le résumé dépasse le budget.")
 
     cache.save(user_id, conversation_id, entry)
     return entry
-
 
 
 def prepare_cached_context(
@@ -308,11 +305,7 @@ def prepare_cached_context(
     """Prépare le contexte et actualise le cache si nécessaire."""
     validate_history(history)
 
-    if (
-        isinstance(keep_pairs, bool)
-        or not isinstance(keep_pairs, int)
-        or keep_pairs < 0
-    ):
+    if isinstance(keep_pairs, bool) or not isinstance(keep_pairs, int) or keep_pairs < 0:
         raise ValueError("keep_pairs doit être un entier positif ou nul.")
 
     # Paramètres partagés par select_context et refresh_summary_cache.
@@ -324,15 +317,16 @@ def prepare_cached_context(
 
     entry = cache.load(user_id, conversation_id)
 
-    context = select_context(history,
-                    entry,
-                    summarizer_fingerprint=summarizer_fingerprint,
-                    token_counter=token_counter,
-                    **budget_options,
-                   )
+    context = select_context(
+        history,
+        entry,
+        summarizer_fingerprint=summarizer_fingerprint,
+        token_counter=token_counter,
+        **budget_options,
+    )
     if context is not None:
-         return context
-    
+        return context
+
     # Garder les derniers couples complets et la question courante.
     covered_until = max(
         1,
@@ -345,16 +339,17 @@ def prepare_cached_context(
             "Réduis keep_pairs ou la taille des messages."
         )
 
-    refreshed_entry = refresh_summary_cache(cache=cache,
-                          user_id=user_id,
-                          conversation_id=conversation_id,
-                          history=history,
-                          covered_until=covered_until,
-                          summarizer_fingerprint=summarizer_fingerprint,
-                          token_counter=token_counter,
-                          generate=generate,
-                          summary_tokens=summary_tokens,
-                          **budget_options,
-                          )
+    refreshed_entry = refresh_summary_cache(
+        cache=cache,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        history=history,
+        covered_until=covered_until,
+        summarizer_fingerprint=summarizer_fingerprint,
+        token_counter=token_counter,
+        generate=generate,
+        summary_tokens=summary_tokens,
+        **budget_options,
+    )
 
     return context_from_cache(history, refreshed_entry)

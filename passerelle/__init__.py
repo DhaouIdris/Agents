@@ -5,6 +5,7 @@ from .client import ChatResult, Metrics, OllamaClient, OllamaError
 from .config import SYSTEM_PROMPT, Settings
 from .memory import ContextManager, build_context, summarize_history
 from .storage import SQLiteStore
+from .summary_cache import SummaryCache, SummaryCacheEntry
 
 __all__ = [
     "Assistant",
@@ -16,6 +17,8 @@ __all__ = [
     "SYSTEM_PROMPT",
     "SQLiteStore",
     "Settings",
+    "SummaryCache",
+    "SummaryCacheEntry",
     "build_context",
     "summarize_history",
 ]

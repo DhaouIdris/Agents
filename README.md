@@ -7,9 +7,9 @@ Le point d'entrée reste **[test.ipynb](test.ipynb)**. Le notebook contient les
 expériences ; les fonctions réutilisables sont dans `passerelle/`. Une fonction
 possède désormais une seule définition.
 
-**Suite M3 : [tester le budget puis implémenter le cache](docs/m3_budget_cache.md).**
-Le guide donne les commandes Windows et notebook. Les tests de budget sont prêts ;
-les fonctions du cache dans `exercises/` restent à compléter.
+**Fin M3 : [validation du parcours intégré](docs/m3_validation.md).**
+`Assistant.chat` utilise désormais le cache persistant et un budget de référence
+par défaut. Ton fichier `exercises/summary_cache.py` reste disponible pour réviser.
 
 ## Installation sous Windows
 
@@ -17,7 +17,7 @@ Dans le dossier du dépôt, avec Python 3.10 ou plus récent :
 
 ```powershell
 py -m venv .venv
-.venv\Scripts\python.exe -m pip install -e ".[notebook]"
+.venv\Scripts\python.exe -m pip install -e ".[notebook,tokenization]"
 .venv\Scripts\python.exe -m ipykernel install --user --name passerelle --display-name "Passerelle (.venv)"
 ```
 
@@ -54,6 +54,9 @@ La configuration par défaut reprend le PC du TP : CPU, 8 Go de RAM,
 `qwen2.5:3b`, contexte 2048, sortie maximale 128 tokens. Ajuster `Settings` dans
 le notebook si nécessaire. Un appel de résumé peut générer jusqu'à 192 tokens.
 Le premier appel et les changements de contexte peuvent nécessiter un chargement.
+Le premier comptage télécharge le tokenizer Hugging Face, pas les poids du modèle.
+Le compteur par défaut cible `qwen2.5:3b` ; pour un autre modèle, fournir un
+`token_counter` adapté lors de la construction de `Assistant`.
 
 Relancer une cellule de conversation ajoute un nouveau tour : ce n'est pas une
 opération idempotente. Le notebook crée un identifiant de démonstration à chaque
@@ -69,6 +72,7 @@ des identifiants distincts et peuvent être rejoués.
 | `passerelle/client.py` | HTTP Ollama, streaming et métriques structurées |
 | `passerelle/storage.py` | Chargement et sauvegarde SQLite par utilisateur/conversation |
 | `passerelle/memory.py` | Validation, fenêtre récente et résumé des anciens messages |
+| `passerelle/summary_cache.py` | Budget, empreintes, cache SQLite et orchestration de la compaction |
 | `passerelle/assistant.py` | Orchestration d'un tour et sauvegarde après succès |
 | `test.ipynb` | Expériences M1–M3 et inspection des résultats |
 | `tests/` | Tests du protocole, de la mémoire, de la persistance et des échecs |
@@ -96,15 +100,24 @@ Les résumés internes restent silencieux.
 
 | Mode de `assistant.chat(..., mode=...)` | Messages transmis |
 | --- | --- |
+| `cached` (défaut) | Historique s'il tient ; sinon résumé valide et tous les échanges non couverts |
 | `full` | Historique complet ; à réserver aux petites conversations |
 | `window` | Système, derniers couples user/assistant, question finale |
-| `summary` (défaut) | Système, résumé de la partie ancienne, échanges récents, question finale |
+| `summary` | Ancienne comparaison : résumé recalculé selon le nombre de couples |
+
+Les modes `full`, `window` et `summary` sont conservés comme expériences historiques
+et ne contrôlent pas les budgets. Pour le projet, utiliser `cached`.
 
 Le résumé est fourni comme données de contexte, sans remplacer les instructions
 système. SQLite conserve les messages originaux et non les messages synthétiques
 de compaction. Une réponse interrompue, vide ou tronquée n'est pas enregistrée
 comme un tour réussi. Des fragments peuvent néanmoins avoir été affichés avant
 qu'une interruption soit détectée.
+
+Un résumé réussi peut rester en cache si l'appel de réponse échoue ensuite : il
+ne couvre que des échanges originaux déjà sauvegardés. L'historique reste inchangé.
+Le texte et les métadonnées d'un résumé sont écrits ensemble, mais l'historique et
+le cache ne partagent pas une transaction globale.
 
 Les validations de rôles couvrent le format M3 : un système suivi de messages
 user/assistant alternés. Les outils seront ajoutés dans un module ultérieur.
@@ -114,6 +127,8 @@ user/assistant alternés. Les outils seront ajoutés dans un module ultérieur.
 ```powershell
 .venv\Scripts\python.exe -m pip install -e ".[dev]"
 .venv\Scripts\python.exe -m unittest discover -s tests -v
+.venv\Scripts\python.exe -m unittest exercises.test_summary_cache -v
+.venv\Scripts\python.exe scripts/validate_m3.py
 .venv\Scripts\python.exe -m ruff check .
 .venv\Scripts\python.exe scripts/check_notebook.py
 ```
@@ -128,11 +143,18 @@ exécute les cellules Python dans l'ordre, sans démarrer de kernel.
 
 ## Limites et suite de la formation
 
-- Sélection encore fondée sur le nombre d'échanges : **aucune garantie de budget
-  en tokens**. Le résumé peut lui-même recevoir trop d'entrée. Utiliser les petits
-  exemples du notebook avant d'ajouter un comptage adapté au modèle.
-- Résumé recalculé à chaque appel qui en a besoin ; cache persistant et position
-  du dernier message couvert restent la prochaine évolution de M3.
+- Le mode `cached` vérifie les deux appels et le contexte assemblé avec le compteur
+  fourni : entrée + sortie réservée + marge <= num_ctx. L'alignement du template HF
+  avec celui d'Ollama doit être mesuré ; ce contrôle n'est pas une preuve universelle
+  d'absence de troncature serveur.
+- Un résumé est réutilisé tant que sa source est valide et le contexte tient. La
+  mise à jour repart des originaux et garde `max_pairs` couples récents. Si le préfixe
+  du résumeur ou le contexte final est trop long, le système refuse explicitement.
+  Compression par morceaux et adaptation automatique du nombre de couples restent
+  des extensions, pas des fonctionnalités déjà implémentées.
+- Le cache dépend du modèle, du prompt et des paramètres du résumeur. Si les poids
+  derrière un tag changent, changer `summary_version` ou utiliser un modèle identifié
+  de manière stable : le code ne résout pas automatiquement le digest Ollama.
 - `user_id` est une identité simulée pour les TP. La clé composée SQLite évite les
   collisions ; elle ne remplace pas l'authentification ni les autorisations.
 - Usage séquentiel local : pas de protection contre deux écritures simultanées
@@ -144,3 +166,4 @@ Le moteur Ollama et les poids du modèle ont des licences distinctes. La version
 Qwen2.5-3B-Instruct porte une **Qwen Research License**, pas une licence Apache
 générique : consulter [sa licence](https://huggingface.co/Qwen/Qwen2.5-3B-Instruct/blob/main/LICENSE)
 pour le périmètre d'utilisation. Le modèle reste configurable.
+

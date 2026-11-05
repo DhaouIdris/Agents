@@ -1,5 +1,10 @@
 # M3 — tester le budget, puis construire le cache
 
+Cette fiche conserve les étapes des exercices. Leur implémentation a été poussée
+dans `exercises/` ; pour utiliser et valider le parcours intégré, suivre
+[la fin de M3](m3_validation.md). Les mentions « à compléter » ci-dessous décrivent
+les consignes initiales, pas l'état actuel du package.
+
 Le dépôt GitHub s'appelle maintenant **DhaouIdris/Agents_Chat**. Le dossier local
 peut encore s'appeler `Agents` : ce n'est pas un problème. Exécuter les commandes
 depuis le dossier qui contient `pyproject.toml` et `test.ipynb`.
@@ -15,8 +20,8 @@ depuis le dossier qui contient `pyproject.toml` et `test.ipynb`.
 | `exercises/summary_cache.py` | Code du prochain exercice, à compléter |
 | `exercises/test_summary_cache.py` | Tests qui définissent le comportement attendu du cache |
 
-Les corrections du budget sont présentes dans cette branche. Le cache reste un
-exercice : ses fonctions lèvent volontairement `NotImplementedError`.
+Les corrections du budget et ton implémentation du cache sont présentes. Le package
+utilise désormais `passerelle/summary_cache.py`, indépendant du fichier d'exercices.
 
 ## 2. Tester le budget depuis le terminal Windows
 
@@ -85,9 +90,8 @@ du template HF au `prompt_eval_count` serveur, sur de petites requêtes explicit
 Une différence indique un alignement à examiner. Même une égalité sur trois
 exemples n'est pas une garantie universelle pour tous les formats de messages.
 
-Le sélecteur de budget est pour l'instant testé séparément : `Assistant.chat`
-ne l'applique pas encore automatiquement. Le budget de l'appel de résumé et
-l'assemblage final seront contrôlés lors de l'intégration du cache.
+`Assistant.chat` applique désormais ces contrôles dans son mode `cached` par défaut,
+y compris au prompt JSON de résumé et au contexte final assemblé.
 
 ## 5. Exercice du cache — partie A : stockage
 
@@ -136,11 +140,13 @@ couvert, raccourcir la source ou changer la configuration doit l'invalider.
 
 ## 7. Intégration suivante, après correction de l'exercice
 
-Le contrôleur chargera le cache par utilisateur/conversation. Tant que le résumé
+Le contrôleur charge le cache par utilisateur/conversation. Tant que le résumé
 et les échanges non couverts tiennent dans le budget, aucun nouvel appel de
-résumé ne sera nécessaire. Sinon, il résumera de nouveaux couples complets avec
-le résumé précédent, sous un budget propre à cet appel.
+résumé n'est nécessaire. Sinon, cette version régénère un résumé depuis un préfixe
+plus long des originaux, sous un budget propre à cet appel. La mise à jour à partir
+du résumé précédent et la compression par morceaux restent des extensions.
 
 Un résumé tronqué ou échoué ne devra pas remplacer le dernier cache valide.
 L'écriture du texte et des métadonnées de couverture sera atomique. L'historique
 brut restera conservé. C'est cette intégration et ses essais qui termineront M3.
+
