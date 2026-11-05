@@ -8,6 +8,7 @@ Ces tests sont volontairement exclus de la commande CI `discover -s tests`.
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from copy import deepcopy
 from pathlib import Path
 
@@ -63,7 +64,7 @@ class CacheStorageTests(unittest.TestCase):
         updated = SummaryCacheEntry("Résumé corrigé.", 3, "new-hash", "prompt-v2")
         self.cache.save("alice", "one", updated)
         self.assertEqual(self.cache.load("alice", "one"), updated)
-        with sqlite3.connect(self.path) as con:
+        with closing(sqlite3.connect(self.path)) as con:
             count = con.execute(
                 "SELECT COUNT(*) FROM summaries WHERE user_id=? AND conversation_id=?",
                 ("alice", "one"),
