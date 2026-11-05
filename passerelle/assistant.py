@@ -4,7 +4,7 @@ from typing import Literal
 
 from .client import ChatResult, OllamaClient, OllamaError, TokenCallback
 from .config import SYSTEM_PROMPT
-from .memory import ContextManager, validate_history
+from .memory import ContextManager, fit_recent_context, validate_history
 from .storage import SQLiteStore
 from .summary_cache import SummaryCache, make_summarizer_fingerprint, prepare_cached_context
 from .tokens import count_tokens
@@ -42,7 +42,7 @@ class Assistant:
         conversation_id: str,
         text: str,
         *,
-        mode: Literal["cached", "full", "window", "summary"] = "cached",
+        mode: Literal["recent", "cached", "full", "window", "summary"] = "cached",
         stream: bool = True,
         on_token: TokenCallback | None = None,
     ) -> ChatResult:
@@ -55,7 +55,15 @@ class Assistant:
         if len(history) > 1 and history[-1]["role"] != "assistant":
             raise ValueError("La conversation sauvegardée contient un tour inachevé.")
         history.append({"role": "user", "content": text})
-        if mode == "cached":
+        if mode == "recent":
+            messages = fit_recent_context(
+                history,
+                self.token_counter,
+                num_ctx=self.client.settings.num_ctx,
+                reserved_output=self.client.settings.max_tokens,
+                margin=self.margin,
+            )
+        elif mode == "cached":
             settings = self.client.settings
             messages = prepare_cached_context(
                 history=history,

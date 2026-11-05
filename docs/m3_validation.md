@@ -5,6 +5,43 @@ Les fonctions travaillées sont intégrées dans `passerelle/summary_cache.py` ;
 le fichier d'exercices est conservé. On termine la partie logicielle avec les tests
 ci-dessous, puis la validation locale du modèle avec Ollama.
 
+## Bilan de l'essai local et décision pour la suite
+
+Les acquis techniques de M3 sont couverts : séparation des conversations, persistance,
+sélection sous budget, calcul de couverture, invalidation et réutilisation du cache,
+traitement des erreurs et diagnostic avec réponses témoins. La fidélité du résumé
+génératif reste non validée. Il n'est pas nécessaire d'obtenir un résumé parfait sur
+ce petit modèle pour apprendre l'ingénierie de la mémoire, mais cet échec doit rester
+visible et empêcher de présenter la compaction comme fiable.
+
+Dans le dernier essai, les appels de résumé et de réponse ont des écarts de comptage
+nuls et le cache est réutilisé. La réponse retrouve Lina, Lyon et CPU. En revanche,
+le résumé invente une limite de 24 dossiers simultanés, un choix de formations à faire
+et des questions sur les coûts et délais. La liste DEMO-000 à DEMO-024 comporte 25
+dossiers ; aucun plafond de traitement n'est déclaré. Les faux « décisions » et
+« questions ouvertes » montrent une limite du format imposé : remplir une rubrique
+n'autorise pas à inventer son contenu. Un compteur lexical ou le contrôle du style
+ne suffit pas à vérifier la fidélité des relations et des intentions.
+
+Pour poursuivre le MVP, utiliser explicitement le mode récent borné :
+
+```python
+result = assistant.chat("alice", "discussion-1", "Ma question", mode="recent")
+```
+
+Ce mode utilise `fit_recent_context`, conserve le système et la question courante,
+et retire les couples les plus anciens jusqu'à respecter le budget. L'historique
+original reste intégralement dans SQLite. La perte d'accès aux informations anciennes
+est une limite explicite ; si le système et la question seuls dépassent, l'appel est
+refusé avant génération. Cela ne garantit pas que le LLM répondra toujours fidèlement,
+mais évite de réinjecter un résumé généré non validé. `cached` reste disponible pour
+l'expérimentation et ses tests continuent à signaler cet échec de qualité.
+
+Nous ne validons pas la qualité de la mémoire générative ni un usage en production.
+La clôture pédagogique de M3 porte sur l'implémentation et sur la capacité à observer,
+isoler et documenter ce défaut. L'évaluation de compaction sur des conversations plus
+variées et la mémoire structurée vérifiée restent des extensions.
+
 ## 1. Préparer l'environnement
 
 Depuis la racine du dépôt, après avoir récupéré cette branche :
@@ -25,7 +62,7 @@ puis redémarrer ce kernel. L'installation ne fait pas partie des cellules de te
 .\.venv\Scripts\python.exe scripts/validate_m3.py
 ```
 
-La suite principale comporte 54 tests ; les deux parties historiques de l'exercice
+La suite principale comporte 56 tests ; les deux parties historiques de l'exercice
 en comportent 12. La démonstration appelle le vrai `Assistant.chat` et SQLite avec
 un générateur et un compteur simulés. Elle doit afficher :
 
@@ -192,6 +229,7 @@ concurrence. La réussite des tests ne rend pas le système prêt pour la produc
 - Une erreur ne constitue pas un tour réussi ; aucun texte partiel ne doit être
   sauvegardé comme réponse complète.
 
-Après les tests logiciels et l'essai live relu ensemble, M3 est validé. M4 portera
+Après les tests logiciels et l'essai live relu ensemble, les acquis techniques de M3
+sont validés, avec la limite de fidélité ci-dessus. M4 portera
 sur le corpus documentaire : ingestion, métadonnées, découpage et provenance, avant
 de construire et mesurer la recherche.

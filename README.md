@@ -11,6 +11,13 @@ possède désormais une seule définition.
 `Assistant.chat` utilise désormais le cache persistant et un budget de référence
 par défaut. Ton fichier `exercises/summary_cache.py` reste disponible pour réviser.
 
+**Bilan du test local :** le comptage et la réutilisation du cache fonctionnent sur
+les cas testés, mais le résumé génératif invente encore des décisions et des questions.
+Pour poursuivre le projet, utiliser explicitement `assistant.chat(..., mode="recent")` :
+ce mode transmet les messages originaux récents sous un budget en tokens. Les messages
+anciens peuvent alors ne plus être accessibles au modèle, tout en restant dans SQLite.
+Le mode `cached` reste disponible comme expérimentation de compaction non validée.
+
 ## Installation sous Windows
 
 Dans le dossier du dépôt, avec Python 3.10 ou plus récent :
@@ -86,7 +93,7 @@ client = OllamaClient(settings)
 store = SQLiteStore(settings.db_path)
 assistant = Assistant(client, store)
 
-result = assistant.chat("alice", "discussion-1", "Je m'appelle Lina.", stream=False)
+result = assistant.chat("alice", "discussion-1", "Je m'appelle Lina.", mode="recent", stream=False)
 print(result.content)
 print(result.metrics.as_dict())
 ```
@@ -102,13 +109,15 @@ ne doit pas être diagnostiqué automatiquement comme une absence de modèle ou 
 
 | Mode de `assistant.chat(..., mode=...)` | Messages transmis |
 | --- | --- |
+| `recent` (recommandé pour poursuivre le MVP) | Messages originaux récents, couples complets, budget en tokens |
 | `cached` (défaut) | Historique s'il tient ; sinon résumé valide et tous les échanges non couverts |
 | `full` | Historique complet ; à réserver aux petites conversations |
 | `window` | Système, derniers couples user/assistant, question finale |
 | `summary` | Ancienne comparaison : résumé recalculé selon le nombre de couples |
 
 Les modes `full`, `window` et `summary` sont conservés comme expériences historiques
-et ne contrôlent pas les budgets. Pour le projet, utiliser `cached`.
+et ne contrôlent pas les budgets. `recent` et `cached` contrôlent les budgets avec
+le compteur fourni ; seul `cached` ajoute un résumé généré.
 
 Le résumé est fourni comme données de contexte, sans remplacer les instructions
 système. SQLite conserve les messages originaux et non les messages synthétiques

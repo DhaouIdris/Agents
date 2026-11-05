@@ -327,6 +327,26 @@ class CachedAssistantTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "token_counter"):
             Assistant(self.client, self.store)
 
+    def test_recent_mode_sends_original_recent_pairs_without_summary_generation(self):
+        self.assistant.chat("alice", "one", "Question actuelle", mode="recent", stream=False)
+        self.assertEqual(self.client.generate.call_count, 1)
+        sent = self.client.generate.call_args.args[0]
+        self.assertEqual(sent[0], self.initial_history[0])
+        self.assertEqual(sent[1:-1], self.initial_history[3:])
+        self.assertEqual(sent[-1], {"role": "user", "content": "Question actuelle"})
+        self.assertLessEqual(fake_counter(sent) + 20 + 10, 100)
+        self.assertIsNone(self.assistant.summary_cache.load("alice", "one"))
+        saved = self.store.load("alice", "one")
+        self.assertEqual(saved[:7], self.initial_history)
+        self.assertEqual(len(saved), 9)
+
+    def test_recent_mode_refuses_irreducible_oversize_without_saving_or_generating(self):
+        self.assistant.token_counter = lambda messages: 1000
+        with self.assertRaisesRegex(ValueError, "système et la dernière question"):
+            self.assistant.chat("alice", "one", "Trop long", mode="recent", stream=False)
+        self.client.generate.assert_not_called()
+        self.assertEqual(self.store.load("alice", "one"), self.initial_history)
+
 
 if __name__ == "__main__":
     unittest.main()
